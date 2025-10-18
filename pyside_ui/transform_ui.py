@@ -1,33 +1,86 @@
 from PySide6 import QtWidgets, QtCore
+from PySide6.QtGui import QPixmap
 from shiboken6 import wrapInstance
 from maya import cmds
 import maya.OpenMayaUI as omui
+import os
+
 
 def get_maya_main_window():
     main_window_ptr = omui.MQtUtil.mainWindow()
     return wrapInstance(int(main_window_ptr), QtWidgets.QMainWindow)
 
+
 class TransformUI(QtWidgets.QDialog):
     def __init__(self, parent=get_maya_main_window()):
         super().__init__(parent)
+
         self.setWindowTitle("Transform Tool - PySide6")
         self.setFixedSize(400, 250)
+
         self.build_ui()
         self.connect_signals()
-        self.selection_job = cmds.scriptJob(event=["SelectionChanged", self.on_selection_changed], protected=True)
+
+        self.selection_job = cmds.scriptJob(
+            event=["SelectionChanged", self.on_selection_changed], protected=True
+        )
 
     def build_ui(self):
         layout = QtWidgets.QVBoxLayout(self)
 
-        self.object_label = QtWidgets.QLabel("Object: [ No selection ]")
-        layout.addWidget(self.object_label)
+        # 🟣 Apply dark violet theme
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #4b0082;
+                color: white;
+            }
+            QLabel, QCheckBox {
+                color: white;
+            }
+            QLineEdit {
+                background-color: #2e003e;
+                color: white;
+                border: 1px solid #8a2be2;
+            }
+            QPushButton {
+                background-color: #6a0dad;
+                color: white;
+                border: none;
+                padding: 5px;
+            }
+            QPushButton:hover {
+                background-color: #7b1fa2;
+            }
+        """)
 
+        # 🟣 Header layout (object label + logo)
+        header_layout = QtWidgets.QHBoxLayout()
+        self.object_label = QtWidgets.QLabel("Object: [ No selection ]")
+        header_layout.addWidget(self.object_label)
+
+        # Load logo image
+        image_path = os.path.join(os.path.dirname(__file__), "logo.png")  # Change if needed
+        if os.path.exists(image_path):
+            logo_label = QtWidgets.QLabel()
+            pixmap = QPixmap(image_path)
+            pixmap = pixmap.scaled(128, 128, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+            logo_label.setPixmap(pixmap)
+            logo_label.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignTop)
+            header_layout.addWidget(logo_label)
+        else:
+            print(f"⚠️ Logo not found at: {image_path}")
+
+        layout.addLayout(header_layout)
+
+        # 🟣 Translate inputs
         self.translate_inputs = self.create_vector_input("Translate")
         layout.addLayout(self.translate_inputs['layout'])
 
+        # 🟣 Rotate inputs
         self.rotate_inputs = self.create_vector_input("Rotate")
         layout.addLayout(self.rotate_inputs['layout'])
 
+        # 🟣 Button rows
         btn_row_1 = QtWidgets.QHBoxLayout()
         self.spawn_btn = QtWidgets.QPushButton("Spawn camera Object")
         self.reset_btn = QtWidgets.QPushButton("Reset")
@@ -85,9 +138,15 @@ class TransformUI(QtWidgets.QDialog):
         self.reset_btn.clicked.connect(self.reset_fields)
 
         self.translate_inputs['checkbox'].stateChanged.connect(
-            lambda: self.set_enabled_state(self.translate_inputs, self.translate_inputs['checkbox'].isChecked()))
+            lambda: self.set_enabled_state(
+                self.translate_inputs, self.translate_inputs['checkbox'].isChecked()
+            )
+        )
         self.rotate_inputs['checkbox'].stateChanged.connect(
-            lambda: self.set_enabled_state(self.rotate_inputs, self.rotate_inputs['checkbox'].isChecked()))
+            lambda: self.set_enabled_state(
+                self.rotate_inputs, self.rotate_inputs['checkbox'].isChecked()
+            )
+        )
 
         self.update_selected_object()
         self.update_transform_fields()
